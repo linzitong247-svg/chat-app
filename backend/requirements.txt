@@ -1,0 +1,25 @@
+# DeepSeek 聊天应用 - 依赖包
+
+# FastAPI 核心依赖
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# 数据库
+# sqlite3 是 Python 内置的，不需要安装
+
+# HTTP 客户端
+httpx>=0.25.1
+
+# LangChain 相关
+langchain>=0.1.0
+langchain-openai>=0.0.2
+langchain-community>=0.0.2
+langchain-chroma>=0.1.0
+
+# 文档处理
+# Chroma 向量数据库
+chromadb>=0.4.0
+
+# 环境变量
+python-dotenv>=1.0.0
