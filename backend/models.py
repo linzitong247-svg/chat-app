@@ -8,8 +8,8 @@ API 请求和响应的数据模型定义
 - JSON 序列化/反序列化
 - API 文档自动生成
 """
+from __future__ import annotations
 from pydantic import BaseModel
-from typing import Optional, List
 
 
 class CreateConversationRequest(BaseModel):
@@ -25,7 +25,7 @@ class CreateConversationRequest(BaseModel):
         >>> req = CreateConversationRequest(title="技术讨论")
         >>> req = CreateConversationRequest()  # 使用默认标题
     """
-    title: Optional[str] = None  # 对话标题
+    title: str | None = None  # 对话标题
 
 
 class SendMessageRequest(BaseModel):
@@ -167,5 +167,5 @@ class RAGChatResponse(BaseModel):
     """
     conversation_id: int
     response: str
-    context_used: List[str]
-    timestamp: Optional[str] = None
+    context_used: list[str]
+    timestamp: str | None = None

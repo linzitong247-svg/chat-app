@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>花纹样式选择 - 智言·企业智库</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', 'PingFang SC', sans-serif;
+      background: #f5f2ec;
+      padding: 40px 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #0f1419;
+      margin-bottom: 10px;
+      font-family: 'Noto Serif SC', serif;
+    }
+    .subtitle {
+      text-align: center;
+      color: #6b7685;
+      margin-bottom: 40px;
+    }
+    .patterns-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .pattern-card {
+      background: #fdfcfa;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 2px solid transparent;
+    }
+    .pattern-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    .pattern-card.selected {
+      border-color: #c9a96e;
+    }
+    .pattern-preview {
+      height: 200px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pattern-label {
+      padding: 16px;
+      text-align: center;
+    }
+    .pattern-name {
+      font-weight: 600;
+      color: #0f1419;
+      margin-bottom: 4px;
+    }
+    .pattern-desc {
+      font-size: 12px;
+      color: #6b7685;
+    }
+
+    /* 花纹样式 */
+
+    /* 1. 中式回纹 */
+    .pattern-meander {
+      background: #faf8f5;
+    }
+    .pattern-meander::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h10v10h-5v5h10v-15h5v20h-15v-5h-5z' fill='none' stroke='%23c9a96e' stroke-width='1' opacity='0.2'/%3E%3Cpath d='M40 40h-10v-10h5v-5h-10v15h-5v-20h15v5h5z' fill='none' stroke='%23c9a96e' stroke-width='1' opacity='0.2'/%3E%3C/svg%3E");
+      background-size: 40px 40px;
+      opacity: 0.6;
+    }
+    .pattern-meander::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 2. 水墨山水 */
+    .pattern-ink {
+      background: linear-gradient(180deg, #faf8f5 0%, #e8e2d8 100%);
+    }
+    .pattern-ink::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='3'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='20'/%3E%3C/filter%3E%3Cellipse cx='100' cy='150' rx='80' ry='40' fill='%230f1419' opacity='0.03' filter='url(%23noise)'/%3E%3Cellipse cx='300' cy='160' rx='100' ry='30' fill='%230f1419' opacity='0.02' filter='url(%23noise)'/%3E%3Cellipse cx='200' cy='140' rx='60' ry='25' fill='%230f1419' opacity='0.04' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size: cover;
+      opacity: 0.8;
+    }
+    .pattern-ink::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 3. 书架线条 */
+    .pattern-shelves {
+      background: #faf8f5;
+    }
+    .pattern-shelves::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, #0f1419 2px, transparent 2px),
+        linear-gradient(to right, #0f1419 2px, transparent 2px),
+        linear-gradient(to right, #0f1419 2px, transparent 2px);
+      background-size: 60px 100%, 100px 100%, 80px 100%;
+      background-position: 10% 0, 50% 0, 85% 0;
+      opacity: 0.06;
+    }
+    .pattern-shelves::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 4. 知识图谱节点 */
+    .pattern-graph {
+      background: #faf8f5;
+    }
+    .pattern-graph::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(201, 169, 110, 0.3) 0%, transparent 5%),
+        radial-gradient(circle at 80% 20%, rgba(201, 169, 110, 0.25) 0%, transparent 4%),
+        radial-gradient(circle at 50% 70%, rgba(201, 169, 110, 0.2) 0%, transparent 6%),
+        radial-gradient(circle at 30% 80%, rgba(201, 169, 110, 0.3) 0%, transparent 4%),
+        radial-gradient(circle at 70% 60%, rgba(201, 169, 110, 0.25) 0%, transparent 5%),
+        linear-gradient(135deg, transparent 40%, rgba(201, 169, 110, 0.1) 50%, transparent 60%);
+    }
+    .pattern-graph::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 5. 宣纸纹理 */
+    .pattern-paper {
+      background: #faf8f5;
+    }
+    .pattern-paper::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      opacity: 0.08;
+    }
+    .pattern-paper::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 6. 金色光晕 */
+    .pattern-glow {
+      background: #faf8f5;
+    }
+    .pattern-glow::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(ellipse at center, rgba(201, 169, 110, 0.2) 0%, rgba(201, 169, 110, 0.1) 30%, transparent 70%);
+    }
+    .pattern-glow::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 7. 几何网格 */
+    .pattern-grid {
+      background: #faf8f5;
+    }
+    .pattern-grid::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(45deg, #0f1419 1px, transparent 1px),
+        linear-gradient(-45deg, #0f1419 1px, transparent 1px);
+      background-size: 30px 30px;
+      opacity: 0.04;
+    }
+    .pattern-grid::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 8. 祥云纹 */
+    .pattern-cloud {
+      background: #faf8f5;
+    }
+    .pattern-cloud::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='50' viewBox='0 0 100 50' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 40 Q15 30 25 35 Q30 25 40 30 Q45 20 55 25 Q60 35 70 30 Q75 40 85 35 Q90 45 95 40' fill='none' stroke='%23c9a96e' stroke-width='1.5' opacity='0.15'/%3E%3Cpath d='M5 45 Q10 38 18 42 Q22 35 30 38' fill='none' stroke='%23c9a96e' stroke-width='1' opacity='0.1'/%3E%3C/svg%3E");
+      background-size: 100px 50px;
+      opacity: 0.8;
+    }
+    .pattern-cloud::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+    }
+
+    /* 9. 组合样式（当前使用）*/
+    .pattern-combined {
+      background: #faf8f5;
+    }
+    .pattern-combined::before {
+      content: '';
+      position: absolute;
+      inset: 20px;
+      border: 2px solid rgba(201, 169, 110, 0.15);
+    }
+    .pattern-combined::after {
+      content: '智言';
+      font-family: 'Noto Serif SC', serif;
+      font-size: 32px;
+      color: #0f1419;
+      z-index: 1;
+      opacity: 0.8;
+      text-shadow: 0 0 40px rgba(201, 169, 110, 0.3);
+    }
+
+    .result {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #fdfcfa;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      display: none;
+    }
+    .result.show { display: block; }
+    .result h3 {
+      color: #0f1419;
+      margin-bottom: 16px;
+    }
+    .result pre {
+      background: #0f1419;
+      color: #e0cc9f;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>花纹样式选择</h1>
+  <p class="subtitle">点击选择你喜欢的背景花纹样式</p>
+
+  <div class="patterns-grid">
+    <div class="pattern-card" data-pattern="meander" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-meander"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">1. 中式回纹</div>
+        <div class="pattern-desc">传统中式回纹图案，象征连绵不断</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="ink" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-ink"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">2. 水墨山水</div>
+        <div class="pattern-desc">水墨晕染效果，文人画意境</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="shelves" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-shelves"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">3. 书架线条</div>
+        <div class="pattern-desc">简约书脊线条，知识殿堂感</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="graph" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-graph"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">4. 知识图谱</div>
+        <div class="pattern-desc">散落的金色节点，知识网络</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="paper" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-paper"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">5. 宣纸纹理</div>
+        <div class="pattern-desc">细腻纸张质感，书写氛围</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="glow" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-glow"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">6. 金色光晕</div>
+        <div class="pattern-desc">中心柔和光晕，聚焦视觉</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="grid" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-grid"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">7. 几何网格</div>
+        <div class="pattern-desc">交叉线条网格，现代简约</div>
+      </div>
+    </div>
+
+    <div class="pattern-card" data-pattern="cloud" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-cloud"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">8. 祥云纹</div>
+        <div class="pattern-desc">传统祥云图案，吉祥如意</div>
+      </div>
+    </div>
+
+    <div class="pattern-card selected" data-pattern="combined" onclick="selectPattern(this)">
+      <div class="pattern-preview pattern-combined"></div>
+      <div class="pattern-label">
+        <div class="pattern-name">9. 组合样式（当前）</div>
+        <div class="pattern-desc">回纹边框 + 光晕 + 节点组合</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result" id="result">
+    <h3>你选择了：<span id="selected-name"></span></h3>
+    <p style="margin-bottom: 12px; color: #6b7685;">请告诉 Claude 你选择的样式编号，例如："我选 4"</p>
+  </div>
+
+  <script>
+    function selectPattern(card) {
+      document.querySelectorAll('.pattern-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+
+      const name = card.querySelector('.pattern-name').textContent;
+      document.getElementById('selected-name').textContent = name;
+      document.getElementById('result').classList.add('show');
+    }
+  </script>
+</body>
+</html>

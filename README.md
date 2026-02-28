@@ -1,276 +1,221 @@
-# DeepSeek 聊天应用
+# 智言 · 企业智库
 
-基于 DeepSeek API 的智能聊天应用，支持多轮对话和 RAG 知识库功能。
+> 基于 DeepSeek API + LangChain + RAG 的企业级智能问答系统
 
----
+一个现代化的企业知识库问答应用，支持流式响应、多轮对话、RAG 检索增强生成。
 
-## 功能特性
-
-### 🎯 核心功能
-- **多轮对话**：支持连续对话，自动维护上下文
-- **RAG 知识库**：基于公司文档的智能问答
-- **对话历史**：自动保存和查看历史记录
-- **现代界面**：基于 Vue 3 + Element Plus 的美观界面
-
-### 📚 知识库支持
-- 支持上传 TXT 文档
-- 自动切分和向量化
-- 智能检索相关内容
-- 集成到对话流程中
+![Vue.js](https://img.shields.io/badge/Vue.js-3.x-4FC08D?logo=vue.js)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?logo=fastapi)
+![LangChain](https://img.shields.io/badge/LangChain-0.1+-1C3C3C?logo=langchain)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python)
 
 ---
 
-## 快速开始
+## 🎯 项目亮点
 
-### 1. 环境准备
+- **🚀 流式响应** - SSE 实时输出，AI 回答逐字显示
+- **📚 RAG 知识库** - 基于 Chroma 向量数据库的智能检索
+- **✨ 现代交互** - 精心设计的动效与视觉体验
+- **🔍 智能搜索** - 全文检索对话历史，关键词高亮
+- **📝 自动标题** - 首条消息自动生成对话标题
 
-#### 后端依赖
+---
+
+## 📸 界面预览
+
+<!-- GIF 预留位置 -->
+> 📌 录制中，即将更新...
+
+| 欢迎页 | 聊天界面 |
+|:---:|:---:|
+| ![欢迎页](./docs/welcome.png) | ![聊天界面](./docs/chat.png) |
+
+---
+
+## 🛠️ 技术栈
+
+### 后端
+- **FastAPI** - 高性能异步 Web 框架
+- **LangChain** - AI 应用开发框架（LCEL 链式调用）
+- **Chroma** - 向量数据库
+- **SQLite** - 轻量级数据持久化
+- **SSE** - Server-Sent Events 流式传输
+
+### 前端
+- **Vue 3** - Composition API
+- **Element Plus** - UI 组件库
+- **Vue Router** - 路由管理
+- **Vite** - 构建工具
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
+- Python 3.10+
+- Node.js 18+
+
+### 1. 克隆项目
 ```bash
-cd backend
-pip install -r requirements.txt
+git clone https://github.com/your-username/chat-app.git
+cd chat-app
 ```
 
-#### 前端依赖
+### 2. 后端配置
+```bash
+cd backend
+
+# 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置 API Key
+echo "DEEPSEEK_API_KEY=your-api-key" > .env
+```
+
+### 3. 前端配置
 ```bash
 cd frontend
 npm install
 ```
 
-### 2. 配置 API Key
-
-创建 `.env` 文件：
+### 4. 启动服务
 ```bash
-cp .env.example .env
+# 终端1 - 启动后端
+cd backend
+uvicorn main:app --reload --port 8000
+
+# 终端2 - 启动前端
+cd frontend
+npm run dev
 ```
 
-编辑 `.env` 文件：
-```env
-DEEPSEEK_API_KEY=your-api-key-here
-```
-
-### 3. 启动服务
-
-#### 方式1：分别启动
-```bash
-# 启动后端
- 后端（带自动重载）：
-  cd D:\claude_project\chat-app\backend
-  uvicorn main:app --reload --host 0.0.0.0 --port 8000
-# 启动前端
-  cd D:\claude_project\chat-app\frontend
-  npm run dev
-
- # 这样两边修改代码都会自动刷新，不用手动重启。
-```
-
-#### 方式2：使用 Docker
-```bash
-docker-compose up -d
-```
-
-### 4. 访问地址
-
+### 5. 访问应用
 - **前端界面**：http://localhost:3000
-- **后端 API**：http://localhost:8000
 - **API 文档**：http://localhost:8000/docs
 
 ---
 
-## 项目结构
+## 📁 项目结构
 
 ```
 chat-app/
-├── backend/                 # 后端代码
-│   ├── main.py             # FastAPI 主程序
-│   ├── models.py           # 数据模型
-│   ├── database.py         # 数据库操作
-│   ├── services/           # 业务逻辑
-│   │   ├── conversation.py      # 对话管理（生产级）
-│   │   ├── chain_builder.py    # LangChain 链构建（LCEL）
-│   │   ├── chat_history.py      # SQLite 历史适配器
-│   │   └── rag_service.py      # RAG 服务
-│   ├── data/               # 知识库文档
-│   │   ├── company_policy.txt
-│   │   └── product_info.txt
-│   └── requirements.txt    # Python 依赖
-├── frontend/               # 前端代码
+├── backend/
+│   ├── main.py              # FastAPI 主入口
+│   ├── models.py            # Pydantic 数据模型
+│   ├── database.py          # SQLite 数据库操作
+│   ├── services/
+│   │   ├── conversation.py  # 对话管理 + 流式生成
+│   │   ├── chain_builder.py # LangChain LCEL 链构建
+│   │   └── rag_service.py   # RAG 检索服务
+│   ├── data/                # 知识库文档
+│   └── chroma_db/           # 向量数据库
+├── frontend/
 │   ├── src/
-│   │   ├── components/     # 组件
-│   │   │   ├── Chat.vue    # 聊天界面
-│   │   │   └── History.vue # 历史记录
-│   │   ├── App.vue         # 根组件
-│   │   └── main.js         # 入口文件
-│   ├── index.html          # HTML 模板
-│   ├── package.json        # Node 依赖
-│   └── vite.config.js      # Vite 配置
-└── README.md              # 项目说明
+│   │   ├── components/
+│   │   │   ├── Chat.vue     # 聊天界面（流式显示、复制）
+│   │   │   └── History.vue  # 侧边栏（搜索、动效）
+│   │   ├── App.vue          # 根组件（欢迎页）
+│   │   └── main.js
+│   └── vite.config.js
+└── README.md
 ```
 
 ---
 
-## API 接口
+## 🔧 核心功能
 
-### 对话管理
-- `POST /api/conversations` - 创建新对话
-- `GET /api/conversations` - 获取对话列表
-- `GET /api/conversations/{id}` - 获取对话详情
-- `DELETE /api/conversations/{id}` - 删除对话
-- `PUT /api/conversations/{id}/title` - 更新标题
-
-### 聊天接口
-- `POST /api/chat` - 普通聊天
-- `POST /api/chat/rag` - RAG 聊天
-- `GET /api/rag/status` - RAG 状态
-
-### 数据格式
-
-#### 聊天请求
-```json
-{
-  "conversation_id": 123,
-  "message": "公司年假几天？",
-  "use_knowledge": true
-}
-```
-
-#### 聊天响应（RAG）
-```json
-{
-  "conversation_id": 123,
-  "response": "根据公司政策，正式员工每年享有5天年假。",
-  "context_used": ["公司年假5天..."],
-  "timestamp": "2024-01-01T10:00:00"
-}
-```
-
----
-
-## 使用指南
-
-### 1. 发起对话
-1. 在左侧点击"新建对话"
-2. 在输入框输入问题
-3. 点击"发送"按钮
-4. 等待 AI 回复
-
-### 2. 使用知识库
-- 开启"使用知识库"开关后，AI 会基于上传的文档回答
-- 可以同时上传多个文档
-- 系统会自动处理文档并建立索引
-
-### 3. 管理对话
-- 点击左侧对话列表切换对话
-- 点击垃圾桶图标删除对话
-- 对话历史自动保存
-
----
-
-## 开发指南
-
-### 后端架构
-- **FastAPI**：高性能 Web 框架
-- **LangChain**：AI 应用框架
-  - **LCEL**（LangChain Expression Language）：管道式链构建
-  - **RunnableWithMessageHistory**：自动管理对话历史
-- **SQLite**：轻量级数据库
-- **Chroma**：向量数据库
-
-### 前端架构
-- **Vue 3**：现代前端框架
-- **Element Plus**：UI 组件库
-- **Vue Router**：路由管理
-- **Axios**：HTTP 客户端
-
-### 数据流程
-```
-用户输入 → 前端 → FastAPI → LangChain → DeepSeek API → 返回结果
-                                    ↓
-                              RAG 知识库检索
-                                    ↓
-                              SQLiteChatMessageHistory
-                              (自动管理对话历史)
-```
-
-### 核心代码示例
-
-#### 使用 RunnableWithMessageHistory（生产级写法）
+### 流式响应 (SSE)
 ```python
-# services/chain_builder.py
-from langchain_core.runnables import RunnableWithMessageHistory
+# 后端 - SSE 端点
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    async def generate():
+        async for token in manager.chat_stream(...):
+            yield f"data: {token}\n\n"
+    return StreamingResponse(generate(), media_type="text/event-stream")
+```
 
-# 创建带历史管理的链
-chain = RunnableWithMessageHistory(
-    base_chain,
-    lambda session_id: SQLiteChatMessageHistory(int(session_id)),
-    input_messages_key="input",
-    history_messages_key="chat_history",
-)
+```javascript
+// 前端 - SSE 消费
+const response = await fetch('/api/chat/stream', { method: 'POST', body })
+const reader = response.body.getReader()
+while (true) {
+    const { done, value } = await reader.read()
+    // 实时追加 token 到消息
+}
+```
 
-# 调用 - LangChain 自动管理历史！
-response = chain.invoke(
-    {"input": "你好"},
-    {"configurable": {"session_id": "123"}}
-)
+### RAG 知识库
+- 文档自动切分（chunk_size=500）
+- Chroma 向量存储
+- 相似度检索 top-k
+
+### 对话自动标题
+```python
+# 首条消息后异步生成标题
+async def generate_title(conversation_id: int, first_message: str):
+    prompt = f"用10个字以内概括这段对话的主题：{first_message}"
+    title = await llm.ainvoke(prompt)
+    update_conversation_title(conversation_id, title)
 ```
 
 ---
 
-## 常见问题
+## 📖 API 接口
 
-### 1. CORS 错误
-确保后端 CORS 配置正确，前端代理正常工作。
-
-### 2. API Key 错误
-检查 `.env` 文件中的 `DEEPSEEK_API_KEY` 是否正确。
-
-### 3. 向量库加载慢
-文档越大，加载时间越长。可以调整 `chunk_size` 参数。
-
-### 4. 前端连接失败
-确认后端服务是否启动，端口是否正确。
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/conversations` | 创建对话 |
+| GET | `/api/conversations` | 对话列表 |
+| DELETE | `/api/conversations/{id}` | 删除对话 |
+| POST | `/api/chat` | 普通聊天（非流式） |
+| POST | `/api/chat/stream` | 流式聊天 ✨ |
+| POST | `/api/chat/rag/stream` | RAG 流式聊天 ✨ |
+| GET | `/api/rag/status` | 知识库状态 |
 
 ---
 
-## 学习重点
+## 🎨 V2 新特性
 
-### 技术要点
-1. **前后端分离**：RESTful API 设计
-2. **AI 集成**：LangChain + DeepSeek API
-3. **RAG 技术**：文档处理、向量化、检索
-4. **对话历史管理**：使用 `RunnableWithMessageHistory` 自动管理
-5. **组件化开发**：Vue 3 组件设计
+> 详见 [CHANGELOG.md](./CHANGELOG.md)
 
-### LangChain 生产级实践
-- **LCEL 语法**：`prompt | llm | parser` 管道式写法
-- **RunnableWithMessageHistory**：自动加载/保存对话历史
-- **SQLite 适配器**：自定义 `ChatMessageHistory` 连接数据库
-
-### 面试重点
-- "为什么选择 RunnableWithMessageHistory 而不是手动管理历史？"
-  - 答：自动管理历史，代码更简洁，符合 LangChain 最佳实践
-- "RAG 如何提升回答准确性？"
-- "如何将 SQLite 数据库适配为 LangChain 的历史管理？"
-  - 答：继承 `BaseChatMessageHistory`，实现 `messages` 属性和 `add_message` 方法
+- ✅ 流式响应（SSE）
+- ✅ 对话自动标题生成
+- ✅ 消息/代码块一键复制
+- ✅ 对话历史全文搜索
+- ✅ 侧边栏折叠动效
+- ✅ 欢迎页引导卡片
+- ✅ 中式视觉风格（回纹、知识图谱）
 
 ---
 
-## 扩展功能
+## 📝 开发笔记
 
-### 待实现功能
-- [ ] 文件上传界面
-- [ ] 对话导出功能
-- [ ] 用户认证系统
-- [ ] 流式输出支持
-- [ ] 多人协作功能
+### 面试常见问题
 
-### 性能优化
-- [ ] Redis 缓存
-- [ ] 数据库分表
-- [ ] 异步任务队列
-- [ ] CDN 静态资源
+**Q: 为什么用 RunnableWithMessageHistory？**
+> 自动管理对话历史，无需手动拼接 messages，符合 LangChain 最佳实践。
+
+**Q: RAG 如何提升回答准确性？**
+> 通过检索相关文档片段，为 LLM 提供上下文，减少幻觉。
+
+**Q: SSE vs WebSocket 的选择？**
+> SSE 单向推送足够，实现简单，自动重连。双向通信才需 WebSocket。
 
 ---
 
-## 许可证
+## 📄 许可证
 
 MIT License
+
+---
+
+## 🙏 致谢
+
+- [DeepSeek](https://www.deepseek.com/) - AI 模型
+- [LangChain](https://langchain.com/) - AI 框架
+- [Element Plus](https://element-plus.org/) - UI 组件

@@ -7,8 +7,10 @@ LangChain 会自动处理：
 - 调用 LLM 生成回复
 - 保存新消息到数据库
 """
+from __future__ import annotations
 import logging
-from typing import Dict, Any, Optional
+from typing import AsyncGenerator
+from collections.abc import AsyncGenerator as AsyncGeneratorABC
 import sys
 from pathlib import Path
 
@@ -32,9 +34,11 @@ class ConversationManager:
             api_key: DeepSeek API Key
         """
         self.chain_builder = ChatChainBuilder(api_key)      # 创建链构建器
-        self.rag_service: Optional[RAGService] = None       # RAG 服务
+        self.rag_service: RAGService | None = None             # RAG 服务
         self.rag_chain = None                               # RAG 链
         self._chain = None                                  # 普通链
+        self._streaming_chain = None                        # 流式链
+        self._streaming_rag_chain = None                    # 流式 RAG 链
 
     # 首次访问时创建普通链 后续访问直接返回
     def _get_chain(self):
@@ -69,7 +73,7 @@ class ConversationManager:
             chain = self._get_chain()
 
             # 调用链 - LangChain 自动管理历史！
-            ai_message = chain.invoke(
+            ai_message = await chain.ainvoke(
                 {"input": user_message},
                 {"configurable": {"session_id": str(conversation_id)}}
             )
@@ -111,7 +115,7 @@ class ConversationManager:
         conversation_id: int,
         user_message: str,
         use_knowledge: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, any]:
         """
         使用 RAG 进行对话（生产级写法）
 
@@ -141,7 +145,7 @@ class ConversationManager:
             context_texts = [doc.page_content for doc in context_docs]
 
             # 调用 RAG 链 - LangChain 自动管理历史！
-            ai_message = self.rag_chain.invoke(
+            ai_message = await self.rag_chain.ainvoke(
                 {"input": user_message},
                 {"configurable": {"session_id": str(conversation_id)}}
             )
@@ -165,6 +169,100 @@ class ConversationManager:
                 "conversation_id": conversation_id,
                 "timestamp": None
             }
+
+    def _get_streaming_chain(self):
+        """获取或创建流式对话链（懒加载）"""
+        if self._streaming_chain is None:
+            self._streaming_chain = self.chain_builder.create_streaming_chain()
+        return self._streaming_chain
+
+    def _get_streaming_rag_chain(self):
+        """获取或创建流式 RAG 对话链（懒加载）"""
+        if self._streaming_rag_chain is None and self.rag_service and self.rag_service.is_ready():
+            retriever = self.rag_service.get_retriever(k=3)
+            self._streaming_rag_chain = self.chain_builder.create_streaming_rag_chain(retriever)
+        return self._streaming_rag_chain
+
+    async def chat_stream(
+        self,
+        conversation_id: int,
+        user_message: str
+    ) -> AsyncGenerator[str, None]:
+        """流式普通对话"""
+        try:
+            logger.info(f"流式处理消息: conversation_id={conversation_id}")
+            chain = self._get_streaming_chain()
+
+            async for token in chain.astream(
+                {"input": user_message},
+                {"configurable": {"session_id": str(conversation_id)}}
+            ):
+                yield token
+
+        except Exception as e:
+            logger.error(f"流式处理消息失败: {e}")
+            raise
+
+    async def chat_with_rag_stream(
+        self,
+        conversation_id: int,
+        user_message: str,
+        use_knowledge: bool = True
+    ) -> AsyncGenerator[str, None]:
+        """流式 RAG 对话"""
+        try:
+            logger.info(f"流式 RAG 消息: conversation_id={conversation_id}")
+
+            if not use_knowledge or not self._get_streaming_rag_chain():
+                async for token in self.chat_stream(conversation_id, user_message):
+                    yield token
+                return
+
+            chain = self._get_streaming_rag_chain()
+
+            async for token in chain.astream(
+                {"input": user_message},
+                {"configurable": {"session_id": str(conversation_id)}}
+            ):
+                yield token
+
+        except Exception as e:
+            logger.error(f"流式 RAG 消息失败: {e}")
+            # 降级到普通流式
+            async for token in self.chat_stream(conversation_id, user_message):
+                yield token
+
+    async def generate_title(self, conversation_id: int, first_message: str) -> str:
+        """根据首条消息生成对话标题"""
+        try:
+            from services.chain_builder import ChatChainBuilder
+            llm = self.chain_builder.create_llm(temperature=0.3)
+            from langchain_core.prompts import ChatPromptTemplate
+            from langchain_core.output_parsers import StrOutputParser
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", "你是一个标题生成助手。用10个字以内概括用户消息的主题，直接输出标题，不要加引号或其他格式。"),
+                ("human", "{message}")
+            ])
+
+            chain = prompt | llm | StrOutputParser()
+            title = await chain.ainvoke({"message": first_message})
+            title = title.strip().strip('"\'')
+
+            # 限制长度
+            if len(title) > 20:
+                title = title[:20]
+
+            # 更新数据库
+            from database import update_conversation_title
+            update_conversation_title(conversation_id, title)
+
+            logger.info(f"生成标题: conversation_id={conversation_id}, title={title}")
+            return title
+
+        except Exception as e:
+            logger.error(f"生成标题失败: {e}")
+            return ""
 
     def is_rag_ready(self) -> bool:
         """检查 RAG 是否就绪"""

@@ -9,18 +9,15 @@ import App from './App.vue'
 const routes = [
   {
     path: '/',
-    redirect: '/history'
-  },
-  {
-    path: '/history',
-    name: 'History',
-    component: () => import('./components/History.vue')
+    name: 'Home',
+    component: () => import('./components/Chat.vue'),
+    meta: { welcome: true }
   },
   {
     path: '/chat/:id',
     name: 'Chat',
     component: () => import('./components/Chat.vue'),
-    props: (route) => ({ id: Number(route.params.id) })  // 转换为数字
+    props: (route) => ({ id: Number(route.params.id) })
   }
 ]
 

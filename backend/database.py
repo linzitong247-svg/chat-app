@@ -175,6 +175,31 @@ def delete_conversation(conversation_id: int):
         conn.close()
 
 
+def delete_all_conversations():
+    """删除所有对话和消息"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 先删除所有消息
+        cursor.execute("DELETE FROM messages")
+
+        # 再删除所有对话
+        cursor.execute("DELETE FROM conversations")
+
+        conn.commit()
+        deleted_count = cursor.rowcount
+        logger.info(f"已删除所有对话数据")
+
+        return deleted_count
+
+    except sqlite3.Error as e:
+        logger.error(f"删除所有对话失败: {e}")
+        raise
+    finally:
+        conn.close()
+
+
 # ============ 消息操作 ============
 
 def add_message(conversation_id: int, role: str, content: str) -> int:
@@ -220,6 +245,26 @@ def get_messages(conversation_id: int, limit: int = 100) -> List[Dict[str, Any]]
     except sqlite3.Error as e:
         logger.error(f"获取消息失败: {e}")
         raise
+    finally:
+        conn.close()
+
+
+def get_message_count(conversation_id: int) -> int:
+    """获取对话的消息数量"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM messages WHERE conversation_id = ?",
+            (conversation_id,)
+        )
+        count = cursor.fetchone()[0]
+        return count
+
+    except sqlite3.Error as e:
+        logger.error(f"获取消息数量失败: {e}")
+        return 0
     finally:
         conn.close()
 

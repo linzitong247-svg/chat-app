@@ -1,9 +1,11 @@
 # FastAPI 主文件
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware  # 跨域资源共享
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 import logging
 import os
+import asyncio
 from datetime import datetime
 from dotenv import load_dotenv
 from logging.handlers import RotatingFileHandler
@@ -24,7 +26,9 @@ from database import (
     get_conversation,
     list_conversations,
     delete_conversation,
-    update_conversation_title
+    delete_all_conversations,
+    update_conversation_title,
+    get_message_count
 )
 from services.conversation import init_conversation_manager, get_conversation_manager
 
@@ -59,7 +63,7 @@ async def lifespan(app: FastAPI):
     """应用启动和关闭时的处理"""
     # 启动时执行
     logger.info("=" * 50)
-    logger.info("DeepSeek 聊天应用启动中...")
+    logger.info("智言 · 企业智库 V2.0 启动中...")
 
     # 从环境变量读取 API Key
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -81,15 +85,15 @@ async def lifespan(app: FastAPI):
     yield
 
     # 关闭时执行
-    logger.info("DeepSeek 聊天应用关闭")
+    logger.info("智言 · 企业智库关闭")
 
 
 # ============ 创建 FastAPI 应用 ============
 
 app = FastAPI(
-    title="DeepSeek 聊天 API",
-    description="基于 LangChain 的多轮对话系统",
-    version="1.0.0",
+    title="智言 · 企业智库 API",
+    description="基于 LangChain 的企业级 RAG 智能问答系统",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -113,8 +117,8 @@ app.add_middleware(
 async def root():
     """健康检查"""
     return {
-        "message": "DeepSeek 聊天 API",
-        "version": "1.0.0",
+        "message": "智言 · 企业智库 API",
+        "version": "2.0.0",
         "status": "running"
     }
 
@@ -216,6 +220,21 @@ async def delete_conversation_endpoint(conversation_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/api/conversations")
+async def delete_all_conversations_endpoint():
+    """删除所有对话"""
+    try:
+        logger.info("删除所有对话")
+
+        count = delete_all_conversations()
+
+        return {"message": f"已删除 {count} 条对话"}
+
+    except Exception as e:
+        logger.error(f"删除所有对话失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/conversations/{conversation_id}/messages")
 async def get_conversation_messages(conversation_id: int):
     """获取对话的所有消息"""
@@ -278,19 +297,25 @@ async def chat_endpoint(request: SendMessageRequest):
     try:
         logger.info(f"收到消息: conversation_id={request.conversation_id}")
 
-        # 从数据库获取对话详情 并 检查对话是否存在
         conversation = get_conversation(request.conversation_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
 
-        # 获取对话管理器
         manager = get_conversation_manager()
 
-        # 调用对话管理器（LangChain 自动管理历史）
+        # 检查是否为首条消息
+        msg_count = get_message_count(request.conversation_id)
+
         ai_message = await manager.chat(
             conversation_id=request.conversation_id,
             user_message=request.message
         )
+
+        # 首条消息后异步生成标题
+        if msg_count == 0:
+            asyncio.create_task(
+                manager.generate_title(request.conversation_id, request.message)
+            )
 
         return ChatResponse(
             conversation_id=request.conversation_id,
@@ -322,21 +347,27 @@ async def rag_chat_endpoint(request: RAGChatRequest):
     try:
         logger.info(f"收到 RAG 消息: conversation_id={request.conversation_id}, use_knowledge={request.use_knowledge}")
 
-        # 检查对话是否存在
         conversation = get_conversation(request.conversation_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
 
-        # 获取对话管理器
         manager = get_conversation_manager()
 
-        # 检查 RAG 是否可用
+        # 检查是否为首条消息
+        msg_count = get_message_count(request.conversation_id)
+
         if not manager.is_rag_ready():
             logger.warning("RAG 未初始化，降级到普通对话")
             ai_message = await manager.chat(
                 conversation_id=request.conversation_id,
                 user_message=request.message
             )
+
+            if msg_count == 0:
+                asyncio.create_task(
+                    manager.generate_title(request.conversation_id, request.message)
+                )
+
             return RAGChatResponse(
                 conversation_id=request.conversation_id,
                 response=ai_message,
@@ -344,12 +375,17 @@ async def rag_chat_endpoint(request: RAGChatRequest):
                 timestamp=datetime.now().isoformat()
             )
 
-        # 调用 RAG 对话
         result = await manager.chat_with_rag(
             conversation_id=request.conversation_id,
             user_message=request.message,
             use_knowledge=request.use_knowledge
         )
+
+        # 首条消息后异步生成标题
+        if msg_count == 0:
+            asyncio.create_task(
+                manager.generate_title(request.conversation_id, request.message)
+            )
 
         return RAGChatResponse(
             conversation_id=result["conversation_id"],
@@ -365,19 +401,105 @@ async def rag_chat_endpoint(request: RAGChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============ 流式响应接口 (SSE) ============
+
+@app.post("/api/chat/stream")
+async def chat_stream_endpoint(request: SendMessageRequest) -> StreamingResponse:
+    """流式普通对话（SSE），逐 token 输出"""
+    conversation = get_conversation(request.conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    manager = get_conversation_manager()
+    msg_count = get_message_count(request.conversation_id)
+    is_first = msg_count == 0
+
+    async def generate():
+        try:
+            async for token in manager.chat_stream(
+                conversation_id=request.conversation_id,
+                user_message=request.message
+            ):
+                yield f"data: {token}\n\n"
+        except Exception as e:
+            logger.error(f"流式生成失败: {e}")
+            yield f"data: [ERROR] {str(e)}\n\n"
+            return
+
+        yield "data: [DONE]\n\n"
+
+        # 首条消息后触发标题生成（在生成器内，事件循环仍在运行）
+        if is_first:
+            asyncio.ensure_future(
+                manager.generate_title(request.conversation_id, request.message)
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/api/chat/rag/stream")
+async def rag_chat_stream_endpoint(request: RAGChatRequest) -> StreamingResponse:
+    """流式 RAG 对话（SSE），逐 token 输出"""
+    conversation = get_conversation(request.conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    manager = get_conversation_manager()
+    msg_count = get_message_count(request.conversation_id)
+    is_first = msg_count == 0
+
+    async def generate():
+        try:
+            async for token in manager.chat_with_rag_stream(
+                conversation_id=request.conversation_id,
+                user_message=request.message,
+                use_knowledge=request.use_knowledge
+            ):
+                yield f"data: {token}\n\n"
+        except Exception as e:
+            logger.error(f"流式 RAG 生成失败: {e}")
+            yield f"data: [ERROR] {str(e)}\n\n"
+            return
+
+        yield "data: [DONE]\n\n"
+
+        if is_first:
+            asyncio.ensure_future(
+                manager.generate_title(request.conversation_id, request.message)
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 # ============ 启动说明 ============
 
 if __name__ == "__main__":
     import uvicorn
 
     print("""
-    ╔════════════════════════════════════════════════╗
-    ║       DeepSeek 聊天应用 - 后端服务             ║
-    ╠════════════════════════════════════════════════╣
-    ║  启动前请确保:                                  ║
-    ║  1. 设置 DEEPSEEK_API_KEY 环境变量              ║
-    ║  2. 或在代码中硬编码 API Key（不推荐）          ║
-    ╚════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════╗
+    ║       智言 · 企业智库 V2.0 - 后端服务           ║
+    ╠══════════════════════════════════════════════════╣
+    ║  启动前请确保:                                    ║
+    ║  1. 设置 DEEPSEEK_API_KEY 环境变量                ║
+    ║  2. 或在代码中硬编码 API Key（不推荐）            ║
+    ╚══════════════════════════════════════════════════╝
 
     启动命令:
         python main.py

@@ -31,14 +31,15 @@ class ChatChainBuilder:
         self._chain = None
         self._rag_chain = None
 
-    def create_llm(self, temperature: float = 0.7):
+    def create_llm(self, temperature: float = 0.7, streaming: bool = False):
         """创建 LLM 实例"""
         return ChatOpenAI(
             openai_api_key=self.api_key,
             openai_api_base=self.base_url,
             model="deepseek-chat",
             temperature=temperature,
-            request_timeout=60
+            request_timeout=60,
+            streaming=streaming
         )
 
     def create_history_aware_chain(self, system_prompt: str = "你是一个专业的 AI 助手。"):
@@ -128,6 +129,66 @@ class ChatChainBuilder:
         )
 
         logger.info("创建带历史管理的 RAG 对话链")
+        return rag_chain
+
+    def create_streaming_chain(self, system_prompt: str = "你是一个专业的 AI 助手。"):
+        """创建支持流式输出的对话链"""
+        llm = self.create_llm(streaming=True)
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("placeholder", "{chat_history}"),
+            ("human", "{input}")
+        ])
+
+        base_chain = prompt | llm | StrOutputParser()
+
+        chain = RunnableWithMessageHistory(
+            base_chain,
+            self._get_history_factory,
+            input_messages_key="input",
+            history_messages_key="chat_history",
+        )
+
+        logger.info("创建流式对话链")
+        return chain
+
+    def create_streaming_rag_chain(self, retriever, system_prompt: str = None):
+        """创建支持流式输出的 RAG 对话链"""
+        llm = self.create_llm(streaming=True)
+
+        if system_prompt is None:
+            system_prompt = """你是一个专业的 AI 助手。基于以下上下文回答用户的问题。
+            如果上下文中没有相关信息，请说"根据已知信息无法回答"。
+            请保持回答简洁准确。
+
+            上下文：
+            {context}"""
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("placeholder", "{chat_history}"),
+            ("human", "{input}")
+        ])
+
+        base_chain = (
+            {
+                "context": itemgetter("input") | retriever,
+                "input": itemgetter("input"),
+            }
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+
+        rag_chain = RunnableWithMessageHistory(
+            base_chain,
+            self._get_history_factory,
+            input_messages_key="input",
+            history_messages_key="chat_history",
+        )
+
+        logger.info("创建流式 RAG 对话链")
         return rag_chain
 
     def _get_history_factory(self, session_id: str):
