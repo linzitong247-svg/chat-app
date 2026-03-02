@@ -2,7 +2,7 @@
 
 > 基于 DeepSeek API + LangChain + RAG 的企业级智能问答系统
 
-一个现代化的企业知识库问答应用，支持流式响应、多轮对话、RAG 检索增强生成。
+一个现代化的企业知识库问答应用，支持多轮对话、RAG 检索增强生成。
 
 ![Vue.js](https://img.shields.io/badge/Vue.js-3.x-4FC08D?logo=vue.js)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688?logo=fastapi)
@@ -13,7 +13,6 @@
 
 ## 🎯 项目亮点
 
-- **🚀 流式响应** - SSE 实时输出，AI 回答逐字显示
 - **📚 RAG 知识库** - 基于 Chroma 向量数据库的智能检索
 - **📂 知识库管理** - 支持 PDF/Word/TXT 上传、预览、删除
 - **✨ 现代交互** - 精心设计的动效与视觉体验
@@ -59,7 +58,6 @@
 - **LangChain** - AI 应用开发框架（LCEL 链式调用）
 - **Chroma** - 向量数据库
 - **SQLite** - 轻量级数据持久化
-- **SSE** - Server-Sent Events 流式传输
 - **PyPDF / Docx2txt** - 多格式文档解析
 
 ### 前端
@@ -129,7 +127,7 @@ chat-app/
 │   ├── models.py            # Pydantic 数据模型
 │   ├── database.py          # SQLite 数据库操作
 │   ├── services/
-│   │   ├── conversation.py  # 对话管理 + 流式生成
+│   │   ├── conversation.py  # 对话管理
 │   │   ├── chain_builder.py # LangChain LCEL 链构建
 │   │   └── rag_service.py   # RAG 检索服务
 │   ├── data/                # 知识库文档
@@ -137,7 +135,7 @@ chat-app/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Chat.vue     # 聊天界面（流式显示、复制）
+│   │   │   ├── Chat.vue     # 聊天界面
 │   │   │   ├── History.vue  # 侧边栏（搜索、动效）
 │   │   │   └── Knowledge.vue # 知识库管理（上传、预览、删除）
 │   │   ├── App.vue          # 根组件（欢迎页）
@@ -150,29 +148,8 @@ chat-app/
 
 ## 🔧 核心功能
 
-### 流式响应 (SSE)
-```python
-# 后端 - SSE 端点
-@app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest):
-    async def generate():
-        async for token in manager.chat_stream(...):
-            yield f"data: {token}\n\n"
-    return StreamingResponse(generate(), media_type="text/event-stream")
-```
-
-```javascript
-// 前端 - SSE 消费
-const response = await fetch('/api/chat/stream', { method: 'POST', body })
-const reader = response.body.getReader()
-while (true) {
-    const { done, value } = await reader.read()
-    // 实时追加 token 到消息
-}
-```
-
 ### RAG 知识库
-- 文档自动切分（chunk_size=500）
+- 文档自动切分（chunk_size=300）
 - Chroma 向量存储
 - 相似度检索 top-k
 
@@ -194,9 +171,8 @@ async def generate_title(conversation_id: int, first_message: str):
 | POST | `/api/conversations` | 创建对话 |
 | GET | `/api/conversations` | 对话列表 |
 | DELETE | `/api/conversations/{id}` | 删除对话 |
-| POST | `/api/chat` | 普通聊天（非流式） |
-| POST | `/api/chat/stream` | 流式聊天 ✨ |
-| POST | `/api/chat/rag/stream` | RAG 流式聊天 ✨ |
+| POST | `/api/chat` | 普通聊天 |
+| POST | `/api/chat/rag` | RAG 聊天 |
 | GET | `/api/rag/status` | 知识库状态 |
 | GET | `/api/knowledge/documents` | 文档列表 |
 | POST | `/api/knowledge/documents` | 上传文档 |
@@ -218,28 +194,12 @@ async def generate_title(conversation_id: int, first_message: str):
 - ✅ 侧边栏选项卡切换（对话 / 知识库）
 
 ### V2 功能
-- ✅ 流式响应（SSE）
 - ✅ 对话自动标题生成
 - ✅ 消息/代码块一键复制
 - ✅ 对话历史全文搜索
 - ✅ 侧边栏折叠动效
 - ✅ 欢迎页引导卡片
 - ✅ 中式视觉风格（回纹、知识图谱）
-
----
-
-## 📝 开发笔记
-
-### 面试常见问题
-
-**Q: 为什么用 RunnableWithMessageHistory？**
-> 自动管理对话历史，无需手动拼接 messages，符合 LangChain 最佳实践。
-
-**Q: RAG 如何提升回答准确性？**
-> 通过检索相关文档片段，为 LLM 提供上下文，减少幻觉。
-
-**Q: SSE vs WebSocket 的选择？**
-> SSE 单向推送足够，实现简单，自动重连。双向通信才需 WebSocket。
 
 ---
 
