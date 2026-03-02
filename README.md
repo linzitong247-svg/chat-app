@@ -38,9 +38,17 @@
 
 ### 界面截图
 
-| 欢迎页 | 聊天界面 | 知识库 |
-|:---:|:---:|:---:|
-| ![欢迎页](./docs/welcome.png) | ![聊天界面](./docs/chat.png) | ![知识库](./docs/knowledge.png) |
+**欢迎页**
+
+![欢迎页](./docs/welcome.png)
+
+**聊天界面**
+
+![聊天界面](./docs/chat.png)
+
+**知识库管理**
+
+![知识库](./docs/knowledge.png)
 
 ---
 
