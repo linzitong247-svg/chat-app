@@ -22,7 +22,28 @@
             <el-icon size="16"><Fold /></el-icon>
           </button>
         </div>
-        <History ref="historyRef" v-show="!sidebarCollapsed" />
+
+        <!-- 选项卡切换 -->
+        <div class="sidebar-tabs" v-show="!sidebarCollapsed">
+          <button
+            class="tab-btn"
+            :class="{ active: activeTab === 'chat' }"
+            @click="switchTab('chat')"
+          >
+            对话
+          </button>
+          <button
+            class="tab-btn"
+            :class="{ active: activeTab === 'knowledge' }"
+            @click="switchTab('knowledge')"
+          >
+            知识库
+          </button>
+        </div>
+
+        <!-- 组件切换 -->
+        <History ref="historyRef" v-show="!sidebarCollapsed && activeTab === 'chat'" />
+        <Knowledge v-show="!sidebarCollapsed && activeTab === 'knowledge'" />
       </el-aside>
 
       <!-- 主内容区 -->
@@ -62,14 +83,27 @@
 import { ref, computed, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import History from './components/History.vue'
+import Knowledge from './components/Knowledge.vue'
 
 const route = useRoute()
 const router = useRouter()
 const historyRef = ref(null)
 const sidebarCollapsed = ref(false)
 
+// 选项卡状态
+const activeTab = ref('chat') // 'chat' | 'knowledge'
+
+const switchTab = (tab) => {
+  activeTab.value = tab
+}
+
 const goHome = () => {
-  router.push('/')
+  // 如果当前在聊天页面，导航回欢迎页
+  if (route.params.id) {
+    router.push({ name: 'Home' })
+    // 切换到对话选项卡
+    activeTab.value = 'chat'
+  }
 }
 
 const refreshHistory = () => {
@@ -226,6 +260,43 @@ const handleSuggestion = async (text) => {
   color: var(--jade-500);
   letter-spacing: 2px;
   text-transform: uppercase;
+}
+
+/* ===== 选项卡切换 ===== */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0 12px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.tab-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tab-btn.active {
+  color: var(--gold-500);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--gold-500);
 }
 
 /* ===== Main Area ===== */

@@ -169,3 +169,39 @@ class RAGChatResponse(BaseModel):
     response: str
     context_used: list[str]
     timestamp: str | None = None
+
+
+# ============ 知识库管理模型 ============
+
+class KnowledgeDocument(BaseModel):
+    """知识库文档模型"""
+    id: int
+    filename: str
+    original_name: str
+    file_type: str
+    file_size: int
+    upload_time: str
+    status: str = 'active'
+
+
+class DocumentUploadResponse(BaseModel):
+    """文档上传响应模型"""
+    id: int
+    filename: str
+    original_name: str
+    message: str
+    chunks: int  # 切分后的块数
+
+
+class RebuildResponse(BaseModel):
+    """重建向量库响应模型"""
+    success: bool
+    message: str
+    document_count: int
+    chunk_count: int
+
+
+class DocumentPreviewResponse(BaseModel):
+    """文档预览响应模型"""
+    content: str
+    filename: str

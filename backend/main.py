@@ -1,14 +1,16 @@
 # FastAPI 主文件
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware  # 跨域资源共享
-from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 import logging
 import os
 import asyncio
+import uuid
+import shutil
 from datetime import datetime
 from dotenv import load_dotenv
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # 加载 .env 文件
 load_dotenv()
@@ -19,7 +21,11 @@ from models import (
     ConversationResponse,
     ChatResponse,
     RAGChatRequest,
-    RAGChatResponse
+    RAGChatResponse,
+    KnowledgeDocument,
+    DocumentUploadResponse,
+    RebuildResponse,
+    DocumentPreviewResponse
 )
 from database import (
     create_conversation,
@@ -28,7 +34,12 @@ from database import (
     delete_conversation,
     delete_all_conversations,
     update_conversation_title,
-    get_message_count
+    get_message_count,
+    create_knowledge_document,
+    list_knowledge_documents,
+    get_knowledge_document,
+    delete_knowledge_document,
+    get_document_by_filename
 )
 from services.conversation import init_conversation_manager, get_conversation_manager
 
@@ -401,90 +412,268 @@ async def rag_chat_endpoint(request: RAGChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============ 流式响应接口 (SSE) ============
+# ============ 知识库管理接口 ============
 
-@app.post("/api/chat/stream")
-async def chat_stream_endpoint(request: SendMessageRequest) -> StreamingResponse:
-    """流式普通对话（SSE），逐 token 输出"""
-    conversation = get_conversation(request.conversation_id)
-    if not conversation:
-        raise HTTPException(status_code=404, detail="对话不存在")
+# 上传目录配置
+UPLOAD_DIR = Path(__file__).parent / "data"
+UPLOAD_DIR.mkdir(exist_ok=True)
 
-    manager = get_conversation_manager()
-    msg_count = get_message_count(request.conversation_id)
-    is_first = msg_count == 0
 
-    async def generate():
-        try:
-            async for token in manager.chat_stream(
-                conversation_id=request.conversation_id,
-                user_message=request.message
-            ):
-                yield f"data: {token}\n\n"
-        except Exception as e:
-            logger.error(f"流式生成失败: {e}")
-            yield f"data: [ERROR] {str(e)}\n\n"
-            return
+@app.get("/api/knowledge/documents", response_model=list[KnowledgeDocument])
+async def list_documents():
+    """获取知识库文档列表"""
+    try:
+        logger.info("获取知识库文档列表")
+        documents = list_knowledge_documents()
+        return documents
+    except Exception as e:
+        logger.error(f"获取知识库文档列表失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-        yield "data: [DONE]\n\n"
 
-        # 首条消息后触发标题生成（在生成器内，事件循环仍在运行）
-        if is_first:
-            asyncio.ensure_future(
-                manager.generate_title(request.conversation_id, request.message)
+@app.post("/api/knowledge/documents", response_model=DocumentUploadResponse)
+async def upload_document(file: UploadFile = File(...)):
+    """
+    上传文档到知识库
+    - 支持 .txt, .pdf, .docx 格式
+    - 自动添加到向量库
+    """
+    try:
+        logger.info(f"上传文档: {file.filename}, content_type: {file.content_type}")
+
+        # 1. 验证文件类型
+        file_ext = Path(file.filename).suffix.lower().lstrip('.')
+        if file_ext not in ['txt', 'pdf', 'docx']:
+            raise HTTPException(
+                status_code=400,
+                detail=f"不支持的文件类型: {file_ext}，仅支持 txt, pdf, docx"
             )
 
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+        # 2. 生成唯一文件名
+        unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
+        file_path = UPLOAD_DIR / unique_filename
+
+        # 3. 保存文件
+        content = await file.read()
+        with open(file_path, 'wb') as f:
+            f.write(content)
+        file_size = len(content)
+
+        logger.info(f"文件已保存: {file_path}, 大小: {file_size} bytes")
+
+        # 4. 检查文件名是否已存在
+        existing = get_document_by_filename(unique_filename)
+        if existing:
+            # 删除旧记录
+            delete_knowledge_document(existing['id'])
+
+        # 5. 保存到数据库
+        doc_id = create_knowledge_document(
+            filename=unique_filename,
+            original_name=file.filename,
+            file_type=file_ext,
+            file_size=file_size
+        )
+
+        logger.info(f"数据库记录已创建: ID={doc_id}")
+
+        # 6. 添加到向量库
+        manager = get_conversation_manager()
+        chunk_count = 0
+        if manager and manager.rag_service:
+            try:
+                chunk_count = manager.rag_service.add_document(
+                    file_path=str(file_path),
+                    file_type=file_ext,
+                    filename=unique_filename
+                )
+                logger.info(f"向量库更新完成: chunks={chunk_count}")
+            except Exception as e:
+                logger.error(f"向量库更新失败: {e}")
+                # 即使向量库更新失败，也返回成功（文件已保存）
+
+        return DocumentUploadResponse(
+            id=doc_id,
+            filename=unique_filename,
+            original_name=file.filename,
+            message="文档上传成功",
+            chunks=chunk_count
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"上传文档失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/chat/rag/stream")
-async def rag_chat_stream_endpoint(request: RAGChatRequest) -> StreamingResponse:
-    """流式 RAG 对话（SSE），逐 token 输出"""
-    conversation = get_conversation(request.conversation_id)
-    if not conversation:
-        raise HTTPException(status_code=404, detail="对话不存在")
+@app.delete("/api/knowledge/documents/{doc_id}")
+async def delete_document_endpoint(doc_id: int):
+    """删除知识库文档"""
+    try:
+        logger.info(f"删除知识库文档: ID={doc_id}")
 
-    manager = get_conversation_manager()
-    msg_count = get_message_count(request.conversation_id)
-    is_first = msg_count == 0
+        # 获取文档信息
+        doc = get_knowledge_document(doc_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="文档不存在")
 
-    async def generate():
-        try:
-            async for token in manager.chat_with_rag_stream(
-                conversation_id=request.conversation_id,
-                user_message=request.message,
-                use_knowledge=request.use_knowledge
-            ):
-                yield f"data: {token}\n\n"
-        except Exception as e:
-            logger.error(f"流式 RAG 生成失败: {e}")
-            yield f"data: [ERROR] {str(e)}\n\n"
-            return
+        # 从数据库软删除
+        delete_knowledge_document(doc_id)
 
-        yield "data: [DONE]\n\n"
+        # 从向量库删除
+        manager = get_conversation_manager()
+        if manager.rag_service:
+            manager.rag_service.remove_document(doc['filename'])
 
-        if is_first:
-            asyncio.ensure_future(
-                manager.generate_title(request.conversation_id, request.message)
-            )
+        # 删除文件
+        file_path = UPLOAD_DIR / doc['filename']
+        if file_path.exists():
+            file_path.unlink()
 
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+        return {"message": "文档已删除"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除文档失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/knowledge/rebuild", response_model=RebuildResponse)
+async def rebuild_vector_store():
+    """重建向量库"""
+    try:
+        logger.info("重建向量库")
+
+        manager = get_conversation_manager()
+        if not manager:
+            raise HTTPException(status_code=500, detail="对话管理器未初始化")
+
+        if not manager.rag_service:
+            raise HTTPException(status_code=500, detail="RAG 服务未初始化")
+
+        # 获取文档数量
+        documents = list_knowledge_documents()
+
+        # 重建向量库
+        logger.info(f"开始重建向量库，文档数量: {len(documents)}")
+        doc_count = manager.rag_service.rebuild_index(data_dir=str(UPLOAD_DIR))
+
+        logger.info(f"向量库重建完成: documents={doc_count}")
+
+        return RebuildResponse(
+            success=True,
+            message="向量库重建成功",
+            document_count=doc_count,
+            chunk_count=0  # 暂时返回0，因为数据库没有存储chunk数量
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"重建向量库失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/knowledge/documents/{doc_id}/preview", response_model=DocumentPreviewResponse)
+async def preview_document(doc_id: int):
+    """预览文档内容"""
+    try:
+        logger.info(f"预览文档: ID={doc_id}")
+
+        doc = get_knowledge_document(doc_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="文档不存在")
+
+        file_path = UPLOAD_DIR / doc['filename']
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="文件不存在")
+
+        manager = get_conversation_manager()
+        if not manager.rag_service:
+            raise HTTPException(status_code=500, detail="RAG 服务未初始化")
+
+        content = manager.rag_service.get_document_preview(str(file_path))
+
+        return DocumentPreviewResponse(
+            content=content,
+            filename=doc['original_name']
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"预览文档失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ 调试接口 ============
+
+@app.get("/api/debug/chunks")
+async def debug_chunks():
+    """调试：查看向量库中所有 chunk 内容"""
+    try:
+        manager = get_conversation_manager()
+        if not manager.rag_service or not manager.rag_service.vectorstore:
+            return {"error": "向量库未加载"}
+
+        collection = manager.rag_service.vectorstore._collection
+        results = collection.get(include=["documents", "metadatas"])
+
+        chunks = []
+        for i, (doc, meta) in enumerate(zip(results['documents'], results['metadatas'])):
+            chunks.append({
+                "index": i,
+                "source": meta.get("source", "unknown"),
+                "content": doc[:200],
+                "length": len(doc)
+            })
+
+        return {"total": len(chunks), "chunks": chunks}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/debug/search")
+async def debug_search(q: str = "报销流程"):
+    """调试：测试向量检索结果"""
+    try:
+        manager = get_conversation_manager()
+        if not manager.rag_service:
+            return {"error": "RAG 未初始化"}
+
+        docs = manager.rag_service.search(q, k=3)
+        results = []
+        for i, doc in enumerate(docs):
+            results.append({
+                "rank": i,
+                "source": doc.metadata.get("source", "unknown"),
+                "content": doc.page_content
+            })
+
+        return {"query": q, "results": results}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/debug/embedding")
+async def debug_embedding(q: str = "报销流程"):
+    """调试：直接测试 SiliconFlow embedding API"""
+    try:
+        manager = get_conversation_manager()
+        embeddings = manager.rag_service.embeddings
+
+        # 直接调用 embedding
+        result = embeddings.embed_query(q)
+        return {
+            "query": q,
+            "embedding_length": len(result),
+            "first_5": result[:5],
+            "status": "OK"
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
 
 
 # ============ 启动说明 ============

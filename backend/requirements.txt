@@ -21,5 +21,15 @@ langchain-chroma>=0.1.0
 # Chroma 向量数据库
 chromadb>=0.4.0
 
+# 多格式文档加载器
+pypdf>=3.0.0           # PDF 文档支持
+docx2txt>=0.8           # DOCX 文档支持
+
+# 文件上传
+python-multipart>=0.0.6 # 表单文件上传
+
+# 异步文件操作
+aiofiles>=23.0.0        # 异步文件读写
+
 # 环境变量
 python-dotenv>=1.0.0

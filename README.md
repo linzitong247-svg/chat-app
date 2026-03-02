@@ -15,6 +15,7 @@
 
 - **🚀 流式响应** - SSE 实时输出，AI 回答逐字显示
 - **📚 RAG 知识库** - 基于 Chroma 向量数据库的智能检索
+- **📂 知识库管理** - 支持 PDF/Word/TXT 上传、预览、删除
 - **✨ 现代交互** - 精心设计的动效与视觉体验
 - **🔍 智能搜索** - 全文检索对话历史，关键词高亮
 - **📝 自动标题** - 首条消息自动生成对话标题
@@ -23,12 +24,23 @@
 
 ## 📸 界面预览
 
-<!-- GIF 预留位置 -->
-> 📌 录制中，即将更新...
+### 对话演示
 
-| 欢迎页 | 聊天界面 |
-|:---:|:---:|
-| ![欢迎页](./docs/welcome.png) | ![聊天界面](./docs/chat.png) |
+![对话演示](./docs/demo-chat.gif)
+
+### 对话管理
+
+![对话管理](./docs/demo-history.gif)
+
+### 知识库管理
+
+![知识库管理](./docs/demo-knowledge.gif)
+
+### 界面截图
+
+| 欢迎页 | 聊天界面 | 知识库 |
+|:---:|:---:|:---:|
+| ![欢迎页](./docs/welcome.png) | ![聊天界面](./docs/chat.png) | ![知识库](./docs/knowledge.png) |
 
 ---
 
@@ -40,6 +52,7 @@
 - **Chroma** - 向量数据库
 - **SQLite** - 轻量级数据持久化
 - **SSE** - Server-Sent Events 流式传输
+- **PyPDF / Docx2txt** - 多格式文档解析
 
 ### 前端
 - **Vue 3** - Composition API
@@ -117,7 +130,8 @@ chat-app/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── Chat.vue     # 聊天界面（流式显示、复制）
-│   │   │   └── History.vue  # 侧边栏（搜索、动效）
+│   │   │   ├── History.vue  # 侧边栏（搜索、动效）
+│   │   │   └── Knowledge.vue # 知识库管理（上传、预览、删除）
 │   │   ├── App.vue          # 根组件（欢迎页）
 │   │   └── main.js
 │   └── vite.config.js
@@ -176,13 +190,26 @@ async def generate_title(conversation_id: int, first_message: str):
 | POST | `/api/chat/stream` | 流式聊天 ✨ |
 | POST | `/api/chat/rag/stream` | RAG 流式聊天 ✨ |
 | GET | `/api/rag/status` | 知识库状态 |
+| GET | `/api/knowledge/documents` | 文档列表 |
+| POST | `/api/knowledge/documents` | 上传文档 |
+| DELETE | `/api/knowledge/documents/{id}` | 删除文档 |
+| POST | `/api/knowledge/rebuild` | 重建向量库 |
+| GET | `/api/knowledge/documents/{id}/preview` | 预览文档 |
 
 ---
 
-## 🎨 V2 新特性
+## 🎨 V3 新特性
 
 > 详见 [CHANGELOG.md](./CHANGELOG.md)
 
+### 知识库管理
+- ✅ 支持 PDF / Word / TXT 文档上传
+- ✅ 文档列表与预览
+- ✅ 一键删除文档
+- ✅ 一键重建向量库
+- ✅ 侧边栏选项卡切换（对话 / 知识库）
+
+### V2 功能
 - ✅ 流式响应（SSE）
 - ✅ 对话自动标题生成
 - ✅ 消息/代码块一键复制

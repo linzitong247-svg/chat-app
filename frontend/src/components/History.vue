@@ -58,16 +58,27 @@
 
     <!-- 空状态 -->
     <div v-if="filteredConversations.length === 0 && !searchQuery" class="empty-state">
+      <div class="empty-icon">
+        <el-icon :size="32"><ChatDotRound /></el-icon>
+      </div>
       <p class="empty-text">暂无对话</p>
       <p class="empty-hint">点击上方按钮开启第一段对话</p>
     </div>
     <div v-if="filteredConversations.length === 0 && searchQuery" class="empty-state">
+      <div class="empty-icon">
+        <el-icon :size="32"><Search /></el-icon>
+      </div>
       <p class="empty-text">未找到匹配的对话</p>
     </div>
 
     <!-- 底部操作区 -->
-    <div v-if="conversations.length > 0" class="footer-actions">
-      <el-button class="delete-all-btn" @click="deleteAllConversations" link>
+    <div class="footer-actions">
+      <el-button
+        v-if="conversations.length > 0"
+        class="delete-all-btn"
+        @click="deleteAllConversations"
+        link
+      >
         <el-icon><Delete /></el-icon>
         <span>清空所有对话</span>
       </el-button>
@@ -88,7 +99,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { Search, ChatDotRound } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 const router = useRouter()
@@ -297,10 +308,11 @@ onMounted(() => {
 
 <style scoped>
 .history-container {
-  height: calc(100% - 64px);
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* Header */
@@ -490,8 +502,13 @@ onMounted(() => {
 
 /* Empty State */
 .empty-state {
-  padding: 40px 20px;
+  padding: 24px 20px;
   text-align: center;
+}
+
+.empty-icon {
+  color: rgba(255, 255, 255, 0.15);
+  margin-bottom: 12px;
 }
 
 .empty-text {
@@ -520,12 +537,18 @@ onMounted(() => {
   gap: 6px;
   color: rgba(255, 255, 255, 0.3);
   font-size: 12px;
-  padding: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  transition: color 0.2s, background-color 0.2s;
 }
 
 .delete-all-btn:hover {
   color: #B5694D;
-  background: rgba(181, 105, 77, 0.08);
+  background: rgba(181, 105, 77, 0.1);
+}
+
+.delete-all-btn .el-icon {
+  font-size: 14px;
 }
 
 /* ===== Rename Dialog ===== */

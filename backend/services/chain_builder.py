@@ -42,7 +42,7 @@ class ChatChainBuilder:
             streaming=streaming
         )
 
-    def create_history_aware_chain(self, system_prompt: str = "你是一个专业的 AI 助手。"):
+    def create_history_aware_chain(self, system_prompt: str = "你叫智言，是企业智能知识库问答助手。请将回复控制在200到250字。"):
         """
         创建带历史管理的对话链（生产级写法）
 
@@ -94,12 +94,18 @@ class ChatChainBuilder:
 
         # 默认 RAG 系统提示词
         if system_prompt is None:
-            system_prompt = """你是一个专业的 AI 助手。基于以下上下文回答用户的问题。
-            如果上下文中没有相关信息，请说"根据已知信息无法回答"。
-            请保持回答简洁准确。
-            
-            上下文：
-            {context}"""
+            system_prompt = """你叫智言，是企业智能知识库问答助手。基于以下上下文回答用户的问题。
+
+如果上下文中没有相关信息，请说"根据已知信息无法回答"。
+
+回答要求：
+1. 回复控制在200到250字
+2. 必须使用 Markdown 格式，结构清晰
+3. 必须使用小标题（###）、列表（- 或 1.）、加粗（**）等格式
+4. 每个要点用列表呈现，关键词加粗
+
+上下文：
+{context}"""
 
         # 创建 RAG 提示词
         prompt = ChatPromptTemplate.from_messages([
@@ -129,66 +135,6 @@ class ChatChainBuilder:
         )
 
         logger.info("创建带历史管理的 RAG 对话链")
-        return rag_chain
-
-    def create_streaming_chain(self, system_prompt: str = "你是一个专业的 AI 助手。"):
-        """创建支持流式输出的对话链"""
-        llm = self.create_llm(streaming=True)
-
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("placeholder", "{chat_history}"),
-            ("human", "{input}")
-        ])
-
-        base_chain = prompt | llm | StrOutputParser()
-
-        chain = RunnableWithMessageHistory(
-            base_chain,
-            self._get_history_factory,
-            input_messages_key="input",
-            history_messages_key="chat_history",
-        )
-
-        logger.info("创建流式对话链")
-        return chain
-
-    def create_streaming_rag_chain(self, retriever, system_prompt: str = None):
-        """创建支持流式输出的 RAG 对话链"""
-        llm = self.create_llm(streaming=True)
-
-        if system_prompt is None:
-            system_prompt = """你是一个专业的 AI 助手。基于以下上下文回答用户的问题。
-            如果上下文中没有相关信息，请说"根据已知信息无法回答"。
-            请保持回答简洁准确。
-
-            上下文：
-            {context}"""
-
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("placeholder", "{chat_history}"),
-            ("human", "{input}")
-        ])
-
-        base_chain = (
-            {
-                "context": itemgetter("input") | retriever,
-                "input": itemgetter("input"),
-            }
-            | prompt
-            | llm
-            | StrOutputParser()
-        )
-
-        rag_chain = RunnableWithMessageHistory(
-            base_chain,
-            self._get_history_factory,
-            input_messages_key="input",
-            history_messages_key="chat_history",
-        )
-
-        logger.info("创建流式 RAG 对话链")
         return rag_chain
 
     def _get_history_factory(self, session_id: str):

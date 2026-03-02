@@ -41,7 +41,7 @@
       </div>
 
       <!-- 加载状态 -->
-      <div v-if="isLoading && !isStreaming" class="message assistant slide-in-left">
+      <div v-if="isLoading" class="message assistant slide-in-left">
         <div class="message-avatar">
           <div class="avatar-ai">智</div>
         </div>
@@ -152,7 +152,6 @@ const router = useRouter()
 const messages = ref([])
 const inputMessage = ref('')
 const isLoading = ref(false)
-const isStreaming = ref(false)
 const error = ref('')
 const useKnowledge = ref(true)
 const messageContainer = ref(null)
@@ -238,107 +237,39 @@ const sendMessage = async () => {
   error.value = ''
   scrollToBottom()
 
-  const streamEndpoint = useKnowledge.value ? '/api/chat/rag/stream' : '/api/chat/stream'
-
   try {
-    const response = await fetch(streamEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        conversation_id: props.id,
-        message: message,
-        use_knowledge: useKnowledge.value
-      })
+    const endpoint = useKnowledge.value ? '/api/chat/rag' : '/api/chat'
+    const response = await axios.post(endpoint, {
+      conversation_id: props.id,
+      message: message,
+      use_knowledge: useKnowledge.value
     })
 
-    if (!response.ok) {
-      console.error('Stream response error:', response.status, response.statusText)
-      throw new Error(`HTTP ${response.status}`)
+    let aiContent
+    if (useKnowledge.value) {
+      aiContent = response.data.response
+    } else {
+      aiContent = response.data.message.content
     }
 
-    isStreaming.value = true
-    const aiMsg = { role: 'assistant', content: '', timestamp: new Date().toISOString() }
-    messages.value.push(aiMsg)
-    console.log('Starting stream, messages count:', messages.value.length)
+    messages.value.push({
+      role: 'assistant',
+      content: aiContent,
+      timestamp: new Date().toISOString()
+    })
     scrollToBottom()
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let tokenCount = 0
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        console.log('Stream done, total tokens:', tokenCount)
-        break
-      }
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6)
-          if (data === '[DONE]') {
-            console.log('Received [DONE]')
-            continue
-          }
-          if (data.startsWith('[ERROR]')) {
-            console.error('Stream error:', data)
-            throw new Error(data.slice(8))
-          }
-          messages.value[messages.value.length - 1].content += data
-          tokenCount++
-        }
-      }
-      scrollToBottom()
-    }
-
-    console.log('Final AI message content:', messages.value[messages.value.length - 1].content)
-
-  } catch (streamErr) {
-    console.error('流式请求失败，回退到普通请求:', streamErr)
-
-    if (messages.value.length > 0 && messages.value[messages.value.length - 1].role === 'assistant') {
-      if (!messages.value[messages.value.length - 1].content) {
-        messages.value.pop()
-      }
-    }
-
-    try {
-      const endpoint = useKnowledge.value ? '/api/chat/rag' : '/api/chat'
-      const response = await axios.post(endpoint, {
-        conversation_id: props.id,
-        message: message,
-        use_knowledge: useKnowledge.value
-      })
-
-      let aiContent
-      if (useKnowledge.value) {
-        aiContent = response.data.response
-      } else {
-        aiContent = response.data.message.content
-      }
-
-      messages.value.push({
-        role: 'assistant',
-        content: aiContent,
-        timestamp: new Date().toISOString()
-      })
-      console.log('Fallback response added')
-    } catch (fallbackErr) {
-      console.error('发送消息失败:', fallbackErr)
-      error.value = fallbackErr.response?.data?.detail || '发送失败，请重试'
-      const userIdx = messages.value.findIndex(m => m === userMsg)
-      if (userIdx !== -1) messages.value.splice(userIdx, 1)
-    }
+    // 延迟刷新，等待后台异步生成标题
+    setTimeout(() => {
+      refreshHistory()
+      loadConversationInfo()  // 刷新当前对话标题
+    }, 3000)
+  } catch (err) {
+    console.error('发送消息失败:', err)
+    error.value = err.response?.data?.detail || '发送失败，请重试'
+    const userIdx = messages.value.findIndex(m => m === userMsg)
+    if (userIdx !== -1) messages.value.splice(userIdx, 1)
   } finally {
     isLoading.value = false
-    isStreaming.value = false
-    scrollToBottom()
-    setTimeout(() => refreshHistory(), 3000)
   }
 }
 
